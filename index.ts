@@ -3,7 +3,11 @@ import cors from '@fastify/cors';
 import mysql from 'mysql2/promise';
 
 const app = fastify();
-app.register(cors);
+app.register(cors, {
+  origin: true,
+  methods: ['GET', 'POST', 'DELETE']
+});
+;
 
 const config = {
   host: "localhost",
@@ -12,6 +16,7 @@ const config = {
   database: "PaginaDoces",
   port: 3306
 };
+
 
 app.get('/', async (request, reply) => {
   reply.send("🍭 API DOCES funcionando!");
@@ -27,23 +32,37 @@ app.get('/doces', async (request, reply) => {
   }
 });
 
+
+app.delete('/doces/:id', async (request, reply) => {
+  const { id } = request.params as { id: string };
+  console.log("Recebendo pedido para deletar doce com ID:", id); // <- AJUDA!
+
+  try {
+    const conn = await mysql.createConnection(config);
+    await conn.query("DELETE FROM doces WHERE id = ?", [id]);
+    reply.status(200).send({ mensagem: "Doce excluído com sucesso!" });
+  } catch (erro) {
+    tratarErroMySQL(erro, reply);
+  }
+});
+
 app.post('/doces', async (request, reply) => {
   try {
-    const { nome, tipo, preco, emEstoque } = request.body as {
+    const { nome, tipo, preco, quantidade } = request.body as {
       nome: string;
       tipo: string;
       preco: number;
-      emEstoque: number;
+      quantidade: number;
     };
 
-    if (!nome || !tipo || preco == null || emEstoque == null) {
+    if (!nome || !tipo || preco == null || quantidade == null) {
       return reply.status(400).send({ mensagem: "Campos obrigatórios ausentes." });
     }
 
     const conn = await mysql.createConnection(config);
     await conn.query(
-      "INSERT INTO doces (nome, tipo, preco, emEstoque) VALUES (?, ?, ?, ?)",
-      [nome, tipo, preco, emEstoque]
+      "INSERT INTO doces (nome, tipo, preco, quantidade) VALUES (?, ?, ?, ?)",
+      [nome, tipo, preco, quantidade]
     );
 
     reply.status(201).send({ mensagem: "Doce cadastrado com sucesso!" });
@@ -51,6 +70,12 @@ app.post('/doces', async (request, reply) => {
     tratarErroMySQL(erro, reply);
   }
 });
+
+
+
+
+
+
 
 function tratarErroMySQL(erro: any, reply: any) {
   if (erro.code === 'ECONNREFUSED') {
@@ -64,6 +89,7 @@ function tratarErroMySQL(erro: any, reply: any) {
     reply.status(500).send({ mensagem: "Erro interno do servidor." });
   }
 }
+
 
 
 app.listen({ port: 8000 }, (err, address) => {
