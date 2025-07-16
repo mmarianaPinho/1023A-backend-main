@@ -31,12 +31,12 @@ function tratarErroMySQL(erro: any, reply: any) {
   }
 }
 
-// ==================== RAIZ ====================
+
 app.get('/', async (request, reply) => {
   reply.send("🍭 API DOCES funcionando!");
 });
 
-// ==================== DOCES ====================
+//DOCES 
 app.get('/doces', async (request, reply) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -78,8 +78,8 @@ app.delete('/doces/:id', async (request, reply) => {
   }
 });
 app.put('/doces/:id/estoque', async (req, reply) => {
-  const { id } = req.params as { id: string };
-  const { quantidade } = req.body as { quantidade: number };
+  const { id } = req.params as any;
+  const { quantidade } = req.body as any;
 
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -95,7 +95,9 @@ app.put('/doces/:id/estoque', async (req, reply) => {
 });
 
 
-// ==================== CLIENTES ====================
+
+
+//  CLIENTES 
 app.get('/clientes', async (_, reply) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -150,8 +152,8 @@ app.delete('/clientes/:id', async (req, reply) => {
   }
 });
 
-// ==================== PEDIDOS ====================
-app.get('/pedidos', async (_, reply) => {
+// PEDIDOS
+   app.get('/pedidos', async (_, reply) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.query("SELECT * FROM pedidos");
@@ -164,16 +166,39 @@ app.get('/pedidos', async (_, reply) => {
 
 app.post('/pedidos', async (req, reply) => {
   const { cliente, doce, quantidade } = req.body as any;
+
+  if (!cliente || !doce || !quantidade) {
+    return reply.status(400).send({ mensagem: "Preencha todos os campos!" });
+  }
+
+  const conn = await mysql.createConnection(dbConfig);
+
   try {
-    const conn = await mysql.createConnection(dbConfig);
+    // Verifica se o cliente existe
+    const [clientes] = await conn.query("SELECT * FROM clientes WHERE nome = ?", [cliente]);
+    if ((clientes as any[]).length === 0) {
+      conn.end();
+      return reply.status(400).send({ mensagem: "Cliente não encontrado no sistema." });
+    }
+
+    // Verifica se o doce existe
+    const [doces] = await conn.query("SELECT * FROM doces WHERE nome = ?", [doce]);
+    if ((doces as any[]).length === 0) {
+      conn.end();
+      return reply.status(400).send({ mensagem: "Doce não encontrado no sistema." });
+    }
+
+    // Cadastra o pedido
     const [result] = await conn.query(
       "INSERT INTO pedidos (cliente, doce, quantidade, data_pedido) VALUES (?, ?, ?, NOW())",
       [cliente, doce, quantidade]
     );
-    conn.end();
     reply.send({ mensagem: "Pedido cadastrado com sucesso!", id: (result as any).insertId });
-  } catch (erro: any) {
-    tratarErroMySQL(erro, reply);
+  } catch (err) {
+    console.error("Erro ao cadastrar pedido:", err);
+    reply.status(500).send({ mensagem: "Erro ao cadastrar pedido." });
+  } finally {
+    conn.end();
   }
 });
 
@@ -205,7 +230,8 @@ app.delete('/pedidos/:id', async (req, reply) => {
   }
 });
 
-// ==================== START ====================
+
+
 app.listen({ port: 8000 }, (err, address) => {
   if (err) {
     console.error(err);
